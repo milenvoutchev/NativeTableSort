@@ -1,0 +1,144 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<link rel="stylesheet" type="text/css" href="./css/default.css">
+
+		<title>Native Table Sort</title>
+		<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+		<script src="http://cdnjs.cloudflare.com/ajax/libs/handlebars.js/1.3.0/handlebars.min.js"></script>
+		<script type="text/javascript">
+			jQuery( document ).ready(function( $ ) {
+				$.support.cors = true;
+				App.init();
+			});
+
+			var App = {
+				dataUrl: "http://rocky-brushlands-8739.herokuapp.com/rates",
+				data: [],
+				template: "#data-template",
+				container: "#container",
+				init: function () {
+					///<summary> Start the app </summary>
+					var app = this;
+
+					app.getData(function(){
+						app.showData(app.data);	
+					});
+					app.attachEvents();
+				},
+				getData: function (callback){
+					///<summary> Fetch our rates data and save to app </summary>
+					var app = this;
+
+					app.say("getData: start");
+
+					// go fetch
+					$.ajax({
+						url: this.dataUrl,
+						error: function (jqXHR, textStatus, errorThrown){
+							app.say("getData: ajax error", textStatus, errorThrown)
+						}
+					})
+					.done(function( response ) {
+						app.say("getData: received data", response.slice(0,10));
+
+						// response has actual data					
+						if ( response.length > 0){
+							var data = [];
+							data.rates = response
+							app.data = data;	// save to app
+							
+							// run callback if any
+							if ( typeof callback == "function" )
+								callback();
+						}
+							
+					});
+				},
+				showData: function (newData) {
+					///<summary> Populate our template and send it to the page </summary>
+					var app = this;
+
+					// prepare data
+					var data = [];
+					data = newData;
+
+					// populate template
+					var source   = $(app.template).html();
+					var template = Handlebars.compile(source);
+
+					$(app.container).empty().append(template(data));
+			
+					app.say("template populated");
+				},
+				attachEvents: function () {
+					///<summary> Attach events </summary>
+					var app = this;
+					
+					$(app.container).on("click", "th", function(evt) {
+						// determine sorting order
+						var sortBy = $(this).attr("rel");
+						var sortIsAsc = $(this).hasClass("desc");
+						var sortClass = sortIsAsc ? "asc" : "desc" ;
+
+						app.say("click: sort by "+sortBy+" "+sortClass)
+						var sortedData = app.sort(sortBy, sortIsAsc);
+						sortedData.sort = {};
+						sortedData.sort[sortBy] = sortClass;
+
+						app.showData(sortedData);	
+					});
+				},
+				sort: function (sortBy, sortIsAsc) {
+					var app = this;
+					
+					var result = app.data;
+					
+					// determine data type
+					if ( typeof result.rates[0][sortBy] == "number" ){
+						// sort int
+						result.rates.sort(function(a,b) { 
+							return ( sortIsAsc ? parseFloat(a.rate) - parseFloat(b.rate) : parseFloat(b.rate) - parseFloat(a.rate) );
+						} );
+					} else {
+						// sort string
+						result.rates.sort(function(a,b) { 
+							return ( sortIsAsc ? a.code.localeCompare(b.code) : b.code.localeCompare(a.code) );
+						} );
+					}
+					return result;
+				},
+				say: function (message){
+					///<summary> Central logging method </summary>
+					if ( console && console.log ) 
+						console.log( arguments.length > 1 ? arguments : message );
+				}
+			}
+			
+		</script>
+	</head>
+	<body id="body" role="application">
+		<div id="container">
+		</div><!--container-->
+
+
+<script id="data-template" type="text/x-handlebars-template"> 
+<table>
+    <thead> 
+        <th rel="code" {{#if sort.code}}class={{sort.code}}{{/if}}>Currency</th> 
+        <th rel="rate" {{#if sort.rate}}class={{sort.rate}}{{/if}}>Rate</th> 
+    </thead> 
+    <tbody> 
+        {{#rates}} 
+        <tr> 
+            <td>{{code}}</td> 
+            <td>{{rate}}</td> 
+        </tr> 
+        {{/rates}} 
+    </tbody> 
+</table> 
+</script>
+
+	</body>
+</html>
