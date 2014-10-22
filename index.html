@@ -17,11 +17,19 @@
 				dataUrl: "http://rocky-brushlands-8739.herokuapp.com/rates",
 				data: [],
 				template: "#data-template",
+				compiledTemplate: null,
 				container: "#container",
 				init: function () {
 					///<summary> Start the app </summary>
 					var app = this;
 
+					// convert the placeholder var to the real DOM object
+					app.container = $(app.container);
+					
+					// load the template only once
+					app.template = $(app.template).html();
+					app.compiledTemplate = Handlebars.compile(app.template);
+					
 					app.getData(function(){
 						app.showData(app.data);	
 					});
@@ -36,12 +44,15 @@
 					// go fetch
 					$.ajax({
 						url: this.dataUrl,
-						error: function (jqXHR, textStatus, errorThrown){
-							app.say("getData: ajax error", textStatus, errorThrown)
-						}
+					})
+					.fail(function (jqXHR, textStatus, errorThrown){
+						app.say("getData: ajax error", textStatus, errorThrown)
 					})
 					.done(function( response ) {
 						app.say("getData: received data", response.slice(0,10));
+						
+						if ( !response )
+							return false;
 
 						// response has actual data					
 						if ( response.length > 0){
@@ -62,13 +73,10 @@
 
 					// prepare data
 					var data = [];
-					data = newData;
+					data = newData || app.data;
 
 					// populate template
-					var source   = $(app.template).html();
-					var template = Handlebars.compile(source);
-
-					$(app.container).empty().append(template(data));
+					app.container.empty().append(app.compiledTemplate(data));
 			
 					app.say("template populated");
 				},
@@ -76,13 +84,14 @@
 					///<summary> Attach events </summary>
 					var app = this;
 					
-					$(app.container).on("click", "th", function(evt) {
+					app.container.on("click", "th", function(evt) {
 						// determine sorting order
-						var sortBy = $(this).attr("rel");
-						var sortIsAsc = $(this).hasClass("desc");
-						var sortClass = sortIsAsc ? "asc" : "desc" ;
+						var sortBy = $(this).attr("rel"),
+							sortIsAsc = $(this).hasClass("desc"),
+							sortClass = sortIsAsc ? "asc" : "desc" ;
 
 						app.say("click: sort by "+sortBy+" "+sortClass)
+						
 						var sortedData = app.sort(sortBy, sortIsAsc);
 						sortedData.sort = {};
 						sortedData.sort[sortBy] = sortClass;
@@ -91,20 +100,19 @@
 					});
 				},
 				sort: function (sortBy, sortIsAsc) {
-					var app = this;
-					
-					var result = app.data;
+					var app = this,
+						result = app.data;
 					
 					// determine data type
 					if ( typeof result.rates[0][sortBy] == "number" ){
 						// sort int
 						result.rates.sort(function(a,b) { 
-							return ( sortIsAsc ? parseFloat(a.rate) - parseFloat(b.rate) : parseFloat(b.rate) - parseFloat(a.rate) );
+							return ( sortIsAsc ? parseFloat(a[sortBy]) - parseFloat(b[sortBy]) : parseFloat(b[sortBy]) - parseFloat(a[sortBy]) );
 						} );
 					} else {
 						// sort string
 						result.rates.sort(function(a,b) { 
-							return ( sortIsAsc ? a.code.localeCompare(b.code) : b.code.localeCompare(a.code) );
+							return ( sortIsAsc ? a[sortBy].localeCompare(b[sortBy]) : b[sortBy].localeCompare(a[sortBy]) );
 						} );
 					}
 					return result;
